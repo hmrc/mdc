@@ -51,6 +51,26 @@ yield ()
 
 There is also a `MdcExecutionContext` for testing code involving async boundaries. Services however should just use the injected `ExecutionContext` provided by bootstrap-play.
 
+### Adding data to MDC
+
+When adding to data to MDC, it should be added via the `RequestMdc`, providing the requestId the data should be correlated to.
+
+```scala
+RequestMdc.add(request.id, Map("mykey", "myvalue"))
+```
+
+This not only ensures the data is available to the current thread's MDC, it also ensures that the data can be restored to any thread where the request is in scope. It can be restored with:
+
+```scala
+RequestMdc.init(request.id)
+```
+
+Some recommended places for doing this are in a Play Action or Error Handler, since MDC added by a Play Filter is sometimes lost when being invoked by Play.
+
+It is also recommended to call `org.slf4j.MDC.clear()` when starting a Thread without a Request (e.g. a scheduler) to ensure no data has been left behind.
+
+Note, it is not necessary to clear the `RequestMdc` since the data is often required longer than expected (e.g. Play error handlers are called after Play filters), and the data is stored in a `WeakHashMap` so becomes a candidate for Garbage Collection when the Request is no longer referenced.
+
 
 ## License
 
