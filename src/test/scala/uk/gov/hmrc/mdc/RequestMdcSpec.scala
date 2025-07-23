@@ -28,6 +28,10 @@ class RequestMdcSpec
      with IntegrationPatience
      with BeforeAndAfter {
 
+  before {
+    org.slf4j.MDC.clear()
+  }
+
   private val random = new scala.util.Random()
 
   "RequestMdc.add" should {
@@ -38,6 +42,17 @@ class RequestMdcSpec
       RequestMdc.add(requestId, data)
 
       Mdc.mdcData shouldBe data
+    }
+
+    "complement any unmanaged Mdc" in {
+      val requestId = random.nextLong()
+
+      val managed   = Map("a" -> "1", "b" -> "2")
+      val unmanaged = Map("c" -> "3")
+      Mdc.putMdc(unmanaged)
+      RequestMdc.add(requestId, managed)
+
+      Mdc.mdcData shouldBe (managed ++ unmanaged)
     }
 
     "init data to Mdc" in {
@@ -72,17 +87,6 @@ class RequestMdcSpec
       Mdc.mdcData shouldBe (data1 ++ data2)
     }
 
-    "clear data" in {
-      val requestId = random.nextLong()
-
-      val data = Map("a" -> "1", "b" -> "2")
-      RequestMdc.add(requestId, data)
-
-      RequestMdc.clear(requestId)
-
-      Mdc.mdcData shouldBe Map.empty
-    }
-
     "not lead to OOM" in {
       def randomString(length: Int): String = {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -94,6 +98,31 @@ class RequestMdcSpec
         RequestMdc.add(requestId.toLong, Map("k" -> randomString(1000)))
       // we're still here, so no OOM
       RequestMdc.mdcData.get().size should be < numEntries
+    }
+  }
+
+  "RequestMdc.clear" should {
+    "clear data" in {
+      val requestId = random.nextLong()
+
+      val data = Map("a" -> "1", "b" -> "2")
+      RequestMdc.add(requestId, data)
+
+      RequestMdc.clear(requestId)
+
+      Mdc.mdcData shouldBe Map.empty
+    }
+
+    "not clear unmanaged MDC data" in {
+      val requestId = random.nextLong()
+
+      val data = Map("a" -> "1", "b" -> "2")
+      RequestMdc.add(requestId, data)
+      Mdc.putMdc(Map("c" -> "3"))
+
+      RequestMdc.clear(requestId)
+
+      Mdc.mdcData shouldBe Map("c" -> "3")
     }
   }
 }

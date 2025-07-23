@@ -18,8 +18,6 @@ package uk.gov.hmrc.mdc
 
 import org.slf4j.MDC
 
-import scala.jdk.CollectionConverters._
-
 /** Provides a stable store of MDC data relating to a Request.
   *
   * As long as all data to be added to the MDC is added via `RequestMdc`
@@ -31,19 +29,24 @@ object RequestMdc {
 
   private[mdc] val mdcData =
     // RequestId -> MdcData
+    // Note, WeakHashMap is mutable - the AtomicReference just serves to
+    // ensure appropriate synchronisation (calls like getAndUpdate will not behave as expected)
     new java.util.concurrent.atomic.AtomicReference(
       // Note, converting to Scala with asScala breaks the weak reference keys
       new java.util.WeakHashMap[Long, Map[String, String]]()
     )
 
   /** Clears the MDC for the provided requestId */
-  def clear(requestId: Long): Unit = {
-    mdcData.updateAndGet { map =>
+  def clear(requestId: Long): Unit =
+    mdcData.getAndUpdate { map =>
+      // This is side-effecting, but should be fine to be repeated if getAndUpdate has a collision.
+      // Ideally we'd make the side-effect after getAndUpdate, but it will return the updated map
+      // since WeakHashMap is mutable.
+      Option(map.get(requestId)).getOrElse(Map.empty)
+        .foreach { case (k, _) => MDC.remove(k) }
       map.remove(requestId)
       map
     }
-    initMdc(requestId)
-  }
 
   /** Adds the provided data to any existing MDC for the provided requestId */
   def add(requestId: Long, data: Map[String, String]): Unit = {
@@ -61,9 +64,9 @@ object RequestMdc {
     * It can be called periodically, to ensure MDC is correct. E.g. after an async boundary.
     */
   def initMdc(requestId: Long): Unit =
-    MDC.setContextMap(
-      Option(mdcData.get().get(requestId))
-        .getOrElse(Map.empty)
-        .asJava
-    )
+    // We're not replacing the whole ContextMap since there may other MDC added that we don't know about
+    // (not added via `RequesMdc`)
+    // However, that data is at risk of not being preserved properly and should be added via the MdcHolder.
+    Option(mdcData.get().get(requestId)).getOrElse(Map.empty)
+      .foreach { case (k, v) => MDC.put(k, v) }
 }
