@@ -55,7 +55,7 @@ class MdcExecutionContextSpec
       logList.loneElement.getMDCPropertyMap.asScala.toMap should contain("someKey" -> "something")
     }
 
-    "ignore an null MDC map" in withCaptureOfLoggingFrom(logger){ logList =>
+    "ignore a null MDC map" in withCaptureOfLoggingFrom(logger){ logList =>
       MDC.setContextMap(Map.empty.asJava)
 
       Future.apply(logger.info(""))(ec).futureValue
