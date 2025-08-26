@@ -101,6 +101,37 @@ class RequestMdcSpec
     }
   }
 
+  "RequestMdc.remove" should {
+    "remove data from Mdc" in {
+      val requestId = random.nextLong()
+
+      RequestMdc.add(requestId, Map("a" -> "1", "b" -> "2"))
+
+      RequestMdc.remove(requestId, "a")
+
+      Mdc.mdcData shouldBe Map("b" -> "2")
+    }
+
+    "not error if empty" in {
+      val requestId = random.nextLong()
+
+      RequestMdc.remove(requestId, "a")
+
+      Mdc.mdcData shouldBe Map.empty
+    }
+
+    "not error if key not found" in {
+      val requestId = random.nextLong()
+
+      val data = Map("a" -> "1", "b" -> "2")
+      RequestMdc.add(requestId, data)
+
+      RequestMdc.remove(requestId, "c")
+
+      Mdc.mdcData shouldBe data
+    }
+  }
+
   "RequestMdc.clear" should {
     "clear data" in {
       val requestId = random.nextLong()

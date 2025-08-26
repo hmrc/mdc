@@ -60,12 +60,21 @@ object RequestMdc {
     initMdc(requestId)
   }
 
+  /** Remove specific data from MDC for the provided requestId and data key */
+  def remove(requestId: Long, key: String): Unit = {
+    mdcData.getAndUpdate { map =>
+      map.put(requestId, Option(map.get(requestId)).getOrElse(Map.empty).removed(key))
+      map
+    }
+    MDC.remove(key)
+  }
+
   /** Ensures the MDC is populated with only the data previously registered with `RequestMdc`.
     * It can be called periodically, to ensure MDC is correct. E.g. after an async boundary.
     */
   def initMdc(requestId: Long): Unit =
     // We're not replacing the whole ContextMap since there may other MDC added that we don't know about
-    // (not added via `RequesMdc`)
+    // (not added via `RequestMdc`)
     // However, that data is at risk of not being preserved properly and should be added via the MdcHolder.
     Option(mdcData.get().get(requestId)).getOrElse(Map.empty)
       .foreach { case (k, v) => MDC.put(k, v) }
