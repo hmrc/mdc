@@ -37,8 +37,8 @@ class MdcSpec
     MDC.clear()
   }
 
-  implicit val ec: ExecutionContext =
-    new MdcExecutionContext(ExecutionContext.Implicits.global.asInstanceOf[ExecutionContextExecutorService])
+  val mdcPreservingEc = new MdcExecutionContext(ExecutionContext.Implicits.global.asInstanceOf[ExecutionContextExecutorService])
+  val mdcLoosingEc = scala.concurrent.ExecutionContext.Implicits.global
 
   "mdcData" should {
     "return a Scala Map" in {
@@ -52,25 +52,25 @@ class MdcSpec
       org.slf4j.MDC.put("k", "v")
 
       runActionWhichLosesMdc()
-        .map(_ => Option(MDC.get("k")))
+        .map(_ => Option(MDC.get("k")))(mdcPreservingEc)
         .futureValue shouldBe None
     }
 
     "restore MDC" in {
       org.slf4j.MDC.put("k", "v")
 
-      Mdc.preservingMdc(runActionWhichLosesMdc())
-        .map(_ => Option(MDC.get("k")))
+      Mdc.preservingMdc(runActionWhichLosesMdc())(mdcLoosingEc)
+        .map(_ => Option(MDC.get("k")))(mdcPreservingEc)
         .futureValue shouldBe Some("v")
     }
 
     "restore MDC when exception is thrown" in {
       org.slf4j.MDC.put("k", "v")
 
-      Mdc.preservingMdc(runActionWhichLosesMdc(fail = true))
+      Mdc.preservingMdc(runActionWhichLosesMdc(fail = true))(mdcLoosingEc)
         .recover { case _ =>
           Option(MDC.get("k"))
-        }.futureValue shouldBe Some("v")
+        }(mdcPreservingEc).futureValue shouldBe Some("v")
     }
   }
 
