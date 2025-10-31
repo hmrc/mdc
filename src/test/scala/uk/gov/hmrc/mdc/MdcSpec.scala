@@ -49,20 +49,20 @@ class MdcSpec
 
   "Preserving MDC" should {
     "show that MDC is lost when switching contexts" in {
-      (for {
-        _ <- Future.successful(org.slf4j.MDC.put("k", "v"))
-        _ <- runActionWhichLosesMdc()
-      } yield
-        Option(MDC.get("k"))
+      (Future.successful(org.slf4j.MDC.put("k", "v"))
+        .flatMap(_ =>
+          runActionWhichLosesMdc()
+            .map(_ => Option(MDC.get("k")))
+        )
       ).futureValue shouldBe None
     }
 
     "restore MDC" in {
-      (for {
-         _ <- Future.successful(org.slf4j.MDC.put("k", "v"))
-         _ <- Mdc.preservingMdc(runActionWhichLosesMdc())
-       } yield
-        Option(MDC.get("k"))
+      (Future.successful(org.slf4j.MDC.put("k", "v"))
+        .flatMap(_ =>
+          Mdc.preservingMdc(runActionWhichLosesMdc())
+            .map(_ => Option(MDC.get("k")))
+        )
       ).futureValue shouldBe Some("v")
     }
 
