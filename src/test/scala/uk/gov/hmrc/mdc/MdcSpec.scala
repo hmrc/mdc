@@ -28,10 +28,10 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService, Futu
 
 class MdcSpec
   extends AnyWordSpec
-     with Matchers
-     with ScalaFutures
-     with IntegrationPatience
-     with BeforeAndAfter {
+    with Matchers
+    with ScalaFutures
+    with IntegrationPatience
+    with BeforeAndAfter {
 
   before {
     MDC.clear()
@@ -49,31 +49,28 @@ class MdcSpec
 
   "Preserving MDC" should {
     "show that MDC is lost when switching contexts" in {
-      (Future.successful(org.slf4j.MDC.put("k", "v"))
-        .flatMap(_ =>
-          runActionWhichLosesMdc()
-            .map(_ => Option(MDC.get("k")))
-        )
-      ).futureValue shouldBe None
+      org.slf4j.MDC.put("k", "v")
+
+      runActionWhichLosesMdc()
+        .map(_ => Option(MDC.get("k")))
+        .futureValue shouldBe None
     }
 
     "restore MDC" in {
-      (Future.successful(org.slf4j.MDC.put("k", "v"))
-        .flatMap(_ =>
-          Mdc.preservingMdc(runActionWhichLosesMdc())
-            .map(_ => Option(MDC.get("k")))
-        )
-      ).futureValue shouldBe Some("v")
+      org.slf4j.MDC.put("k", "v")
+
+      Mdc.preservingMdc(runActionWhichLosesMdc())
+        .map(_ => Option(MDC.get("k")))
+        .futureValue shouldBe Some("v")
     }
 
     "restore MDC when exception is thrown" in {
-      (for {
-         _ <- Future.successful(org.slf4j.MDC.put("k", "v"))
-         _ <- Mdc.preservingMdc(runActionWhichLosesMdc(fail = true))
-       } yield None
-      ).recover { case _ =>
-        Option(MDC.get("k"))
-      }.futureValue shouldBe Some("v")
+      org.slf4j.MDC.put("k", "v")
+
+      Mdc.preservingMdc(runActionWhichLosesMdc(fail = true))
+        .recover { case _ =>
+          Option(MDC.get("k"))
+        }.futureValue shouldBe Some("v")
     }
   }
 
