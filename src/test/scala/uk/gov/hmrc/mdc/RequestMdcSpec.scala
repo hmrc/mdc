@@ -93,7 +93,7 @@ class RequestMdcSpec
         (1 to length).map(_ => chars(random.nextInt(chars.length))).mkString
       }
 
-      val numEntries = 20000
+      val numEntries = 100000
       for (requestId <- 1 to numEntries)
         RequestMdc.add(requestId.toLong, Map("k" -> randomString(1000)))
       // we're still here, so no OOM
