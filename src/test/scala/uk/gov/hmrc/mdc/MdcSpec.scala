@@ -23,22 +23,23 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.MDC
 
+import java.util.UUID
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService, Future}
 
 class MdcSpec
   extends AnyWordSpec
-     with Matchers
-     with ScalaFutures
-     with IntegrationPatience
-     with BeforeAndAfter {
+    with Matchers
+    with ScalaFutures
+    with IntegrationPatience
+    with BeforeAndAfter {
 
   before {
     MDC.clear()
   }
 
-  implicit val ec: ExecutionContext =
-    new MdcExecutionContext(ExecutionContext.Implicits.global.asInstanceOf[ExecutionContextExecutorService])
+  val mdcPreservingEc = new MdcExecutionContext(ExecutionContext.Implicits.global.asInstanceOf[ExecutionContextExecutorService])
+  val mdcLoosingEc = scala.concurrent.ExecutionContext.Implicits.global
 
   "mdcData" should {
     "return a Scala Map" in {
@@ -49,31 +50,44 @@ class MdcSpec
 
   "Preserving MDC" should {
     "show that MDC is lost when switching contexts" in {
-      (for {
-        _ <- Future.successful(org.slf4j.MDC.put("k", "v"))
-        _ <- runActionWhichLosesMdc()
-      } yield
-        Option(MDC.get("k"))
-      ).futureValue shouldBe None
+
+      val k = UUID.randomUUID().toString
+      val v = UUID.randomUUID().toString
+
+      org.slf4j.MDC.put(k, v)
+
+      runActionWhichLosesMdc()
+        .map(_ => Option(MDC.get(k)))(mdcPreservingEc)
+        .futureValue shouldBe None
     }
 
-    "restore MDC" in {
-      (for {
-         _ <- Future.successful(org.slf4j.MDC.put("k", "v"))
-         _ <- Mdc.preservingMdc(runActionWhichLosesMdc())
-       } yield
-        Option(MDC.get("k"))
-      ).futureValue shouldBe Some("v")
+    for (i <- 1 to 100) {
+      s"restore MDC $i" in {
+
+        val k = UUID.randomUUID().toString
+        val v = UUID.randomUUID().toString
+
+        org.slf4j.MDC.put(k, v)
+
+        Mdc.preservingMdc(runActionWhichLosesMdc())(mdcLoosingEc)
+          .map(_ => Option(MDC.get(k)))(mdcPreservingEc)
+          .futureValue shouldBe Some(v)
+      }
     }
 
-    "restore MDC when exception is thrown" in {
-      (for {
-         _ <- Future.successful(org.slf4j.MDC.put("k", "v"))
-         _ <- Mdc.preservingMdc(runActionWhichLosesMdc(fail = true))
-       } yield None
-      ).recover { case _ =>
-        Option(MDC.get("k"))
-      }.futureValue shouldBe Some("v")
+    for (i <- 1 to 100) {
+      s"restore MDC when exception is thrown $i" in {
+
+        val k = UUID.randomUUID().toString
+        val v = UUID.randomUUID().toString
+
+        org.slf4j.MDC.put(k, v)
+
+        Mdc.preservingMdc(runActionWhichLosesMdc(fail = true))(mdcLoosingEc)
+          .recover { case _ =>
+            Option(MDC.get(k))
+          }(mdcPreservingEc).futureValue shouldBe Some(v)
+      }
     }
   }
 

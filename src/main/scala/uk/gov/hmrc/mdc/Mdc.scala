@@ -27,14 +27,14 @@ trait Mdc {
     Option(MDC.getCopyOfContextMap).fold(Map.empty[String, String])(_.asScala.toMap)
 
   def withMdc[A](block: => Future[A], mdcData: Map[String, String])(implicit ec: ExecutionContext): Future[A] =
-    block.map { a =>
+    block.transform({ a =>
       putMdc(mdcData)
       a
-    }.recoverWith {
-      case t =>
+    }, {
+      t =>
         putMdc(mdcData)
-        Future.failed(t)
-    }
+        t
+    })
 
   def putMdc(mdc: Map[String, String]): Unit =
     mdc.foreach {
